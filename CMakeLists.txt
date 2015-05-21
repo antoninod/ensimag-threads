@@ -14,7 +14,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -O3 -std=gnu++11")
 #########
 # Vous devez editer la ligne suivante pour y mettre vos logins
 #########
-set(LOGINS perrettc dangeloan)
+set(LOGINS perrettc dangeloa)
 list(SORT LOGINS)
 
 if (LOGINS MATCHES "login[123]")
