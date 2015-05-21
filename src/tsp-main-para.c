@@ -18,6 +18,19 @@
 #include "tsp-lp.h"
 #include "tsp-hkbound.h"
 
+typedef struct 
+{ 
+        int hops; 
+        int len;
+        uint64_t vpres;
+        tsp_path_t path;
+        long long int *cuts;
+        tsp_path_t sol;
+        int *sol_len;
+} tsp_param_t;
+
+void *lancement_tsp(void* arg);
+
 
 /* macro de mesure de temps, retourne une valeur en nanosecondes */
 #define TIME_DIFF(t1, t2) \
@@ -131,6 +144,8 @@ int main (int argc, char **argv)
    
     /* calculer chacun des travaux */
     tsp_path_t solution;
+
+
     //mise du tableau a +infini
     memset (solution, -1, MAX_TOWNS * sizeof (int));
 
@@ -168,7 +183,9 @@ int main (int argc, char **argv)
     return 0 ;
 }
 
-void *lancement_traitement_job(char *arg)
+void *lancement_tsp(void* arg)
 {
-     
+        tsp_param_t* param = (tsp_param_t*)arg;
+
+        tsp (param->hops, param->len, param->vpres, param->path, param->cuts, param->sol, param->sol_len);
 }
