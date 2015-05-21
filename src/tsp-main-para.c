@@ -20,21 +20,28 @@
 
 typedef struct 
 { 
-        int hops; 
-        int len;
+        struct tsp_queue* q;
         uint64_t vpres;
         tsp_path_t path;
         long long int *cuts;
         tsp_path_t sol;
         int *sol_len;
+
 } tsp_param_t;
 
 void *lancement_tsp(void* arg);
+
+static pthread_mutex_t mutex_queue = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t mutex_minimum = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t mutex_cuts = PTHREAD_MUTEX_INITIALIZER;
+
 
 
 /* macro de mesure de temps, retourne une valeur en nanosecondes */
 #define TIME_DIFF(t1, t2) \
   ((t2.tv_sec - t1.tv_sec) * 1000000000ll + (long long int) (t2.tv_nsec - t1.tv_nsec))
+
+#define NB_LECTURE_MAX 5
 
 
 /* tableau des distances */
@@ -53,6 +60,10 @@ int nb_threads=1;
 bool affiche_sol= false;
 bool affiche_progress=false;
 bool quiet=false;
+    
+//a protéger
+tsp_path_t solution;
+tsp_path_t sol;
 
 static void generate_tsp_jobs (struct tsp_queue *q, int hops, int len, uint64_t vpres, tsp_path_t path, long long int *cuts, tsp_path_t sol, int *sol_len, int depth)
 {
@@ -88,7 +99,6 @@ int main (int argc, char **argv)
     unsigned long long perf;
     tsp_path_t path;
     uint64_t vpres=0;
-    tsp_path_t sol;
     int sol_len;
     long long int cuts = 0;
     struct tsp_queue q;
@@ -143,7 +153,7 @@ int main (int argc, char **argv)
    
    
     /* calculer chacun des travaux */
-    tsp_path_t solution;
+
 
 
     //mise du tableau a +infini
@@ -151,25 +161,29 @@ int main (int argc, char **argv)
 
     solution[0] = 0;
 
-    static pthread_mutex_t mutex_stock = PTHREAD_MUTEX_INITIALIZER;
+    pthread_t* tableau_thread = (pthread_t*)malloc(nb_threads * sizeof(pthread_t));
 
-    //boucle qui traite les jobs
-    while (!empty_queue (&q)) {
-        int hops = 0, len = 0;
-        get_job (&q, solution, &hops, &len, &vpres);
-	
-	// le noeud est moins bon que la solution courante
-	if (minimum < INT_MAX
-	    && (nb_towns - hops) > 10
-	    && ( (lower_bound_using_hk(solution, hops, len, vpres)) >= minimum
-		 || (lower_bound_using_lp(solution, hops, len, vpres)) >= minimum)
-	    )
+    for(int i =0; i < nb_threads; i++)
+    {
+                tsp_param_t* param = (tsp_param_t*)malloc(sizeof(tsp_param_t));
 
-	  continue;
+                param->q = &q;
+                param->vpres = vpres;
+//                param->path = (tsp_path_t) solution;
+                param->cuts = &cuts;
+//                param->sol = sol;
+                param->sol_len = &sol_len;
 
-	tsp (hops, len, vpres, solution, &cuts, sol, &sol_len);
+
+
+                pthread_create(&(tableau_thread[i]),NULL,lancement_tsp, (void*)param);
     }
-    
+
+    for(int i =0; i < nb_threads; i++)
+    {
+            pthread_join(tableau_thread[i], NULL);
+    }
+
     clock_gettime (CLOCK_REALTIME, &t2);
 
     if (affiche_sol)
@@ -186,6 +200,76 @@ int main (int argc, char **argv)
 void *lancement_tsp(void* arg)
 {
         tsp_param_t* param = (tsp_param_t*)arg;
+        tsp_path_t meilleure_sol_local;
 
-        tsp (param->hops, param->len, param->vpres, param->path, param->cuts, param->sol, param->sol_len);
+        int mini_local = minimum;
+        long long int cuts_local = 0;
+
+        int nb_lecture = 0;
+
+        while (1)
+        {
+                int hops = 0, len = 0;
+
+                //DEBUT SECTION CRITIQUE
+                pthread_mutex_lock(&mutex_queue);
+
+                if(empty_queue(param->q))
+                {
+                        pthread_mutex_unlock(&mutex_queue);        
+                        break;
+                }
+                        
+
+                                
+                get_job(param->q, solution, &hops, &len, &(param->vpres));
+
+                pthread_mutex_unlock(&mutex_queue);
+                //FIN SECTION CRITIQUE
+
+	        // le noeud est moins bon que la solution courante
+	        if (mini_local < INT_MAX
+	                && (nb_towns - hops) > 10
+	                && ( (lower_bound_using_hk(solution, hops, len, param->vpres)) >= mini_local
+		                || (lower_bound_using_lp(meilleure_sol_local, hops, len, param->vpres)) >= mini_local)
+	        ) continue;
+
+	        tsp (hops, len, param->vpres, solution, &cuts_local, meilleure_sol_local, &mini_local);
+                nb_lecture++;
+
+                if(nb_lecture >= NB_LECTURE_MAX)
+                {
+                        pthread_mutex_lock(&mutex_minimum);
+
+                        if(mini_local < minimum)
+                        {
+                                minimum = mini_local;
+                                memcpy(sol, meilleure_sol_local, nb_towns*sizeof(int));
+                        }
+
+                        mini_local = minimum;
+                        memcpy(meilleure_sol_local, sol, nb_towns*sizeof(int));
+
+                        pthread_mutex_unlock(&mutex_minimum);
+
+                        nb_lecture =0;
+                }
+        }
+
+        pthread_mutex_lock(&mutex_minimum);
+
+        if(mini_local < minimum)
+        {
+            minimum = mini_local;
+            memcpy(sol, meilleure_sol_local, nb_towns*sizeof(int));
+        }
+
+        pthread_mutex_unlock(&mutex_minimum);
+
+        pthread_mutex_lock(&mutex_cuts);
+        
+        *(param->cuts) += cuts_local;
+
+        pthread_mutex_unlock(&mutex_cuts);
+            
 }
