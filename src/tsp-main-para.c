@@ -131,8 +131,14 @@ int main (int argc, char **argv)
    
     /* calculer chacun des travaux */
     tsp_path_t solution;
+    //mise du tableau a +infini
     memset (solution, -1, MAX_TOWNS * sizeof (int));
+
     solution[0] = 0;
+
+    static pthread_mutex_t mutex_stock = PTHREAD_MUTEX_INITIALIZER;
+
+    //boucle qui traite les jobs
     while (!empty_queue (&q)) {
         int hops = 0, len = 0;
         get_job (&q, solution, &hops, &len, &vpres);
@@ -160,4 +166,9 @@ int main (int argc, char **argv)
 	   perf/1000000ll, perf%1000000ll, cuts);
 
     return 0 ;
+}
+
+void *lancement_traitement_job(char *arg)
+{
+     
 }

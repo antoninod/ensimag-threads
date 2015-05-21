@@ -6,15 +6,15 @@ endif(COMMAND cmake_policy)
 project(Ensitsp)
 enable_testing()
 set(CMAKE_BUILD_TYPE Debug)
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wall -Werror -O3 -std=gnu99")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Werror -O3 -std=gnu++11")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wall -O3 -std=gnu99")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -O3 -std=gnu++11")
 
 #########
 # Gestion des logins
 #########
 # Vous devez editer la ligne suivante pour y mettre vos logins
 #########
-set(LOGINS login1 login2 login3)
+set(LOGINS perrettc dangeloan)
 list(SORT LOGINS)
 
 if (LOGINS MATCHES "login[123]")
